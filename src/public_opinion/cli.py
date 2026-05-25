@@ -9,11 +9,14 @@ from public_opinion.aggregate import (
     aggregate_multi_value_field,
     write_summary_csv,
 )
+from public_opinion.batch_label import BatchApiConfig, build_batch_files, run_batch_labeling
+from public_opinion.config import get_openai_settings
 from public_opinion.export_jsonl import export_model_inputs
 from public_opinion.io import load_records_csv, save_records_csv
 from public_opinion.merge_labels import merge_model_labels
 from public_opinion.normalize import normalize_comments
 from public_opinion.rules import apply_rules
+from public_opinion.validate_labels import validate_raw_results
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -40,6 +43,24 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate_parser = subparsers.add_parser("aggregate")
     aggregate_parser.add_argument("--input", required=True)
     aggregate_parser.add_argument("--output-dir", required=True)
+
+    build_batches_parser = subparsers.add_parser("build-batches")
+    build_batches_parser.add_argument("--input", required=True)
+    build_batches_parser.add_argument("--output-dir", required=True)
+    build_batches_parser.add_argument("--batch-size", required=True, type=int)
+    build_batches_parser.add_argument("--run-id", required=True)
+
+    run_batch_label_parser = subparsers.add_parser("run-batch-label")
+    run_batch_label_parser.add_argument("--input", required=True)
+    run_batch_label_parser.add_argument("--output", required=True)
+    run_batch_label_parser.add_argument("--base-url", required=False)
+    run_batch_label_parser.add_argument("--model", required=False)
+    run_batch_label_parser.add_argument("--timeout-seconds", required=False, type=int)
+
+    validate_labels_parser = subparsers.add_parser("validate-labels")
+    validate_labels_parser.add_argument("--input", required=True)
+    validate_labels_parser.add_argument("--output", required=True)
+    validate_labels_parser.add_argument("--failures-output", required=True)
 
     run_pipeline_parser = subparsers.add_parser("run-pipeline")
     run_pipeline_parser.add_argument("--input", required=True)
@@ -73,6 +94,42 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "aggregate":
         _run_aggregate(Path(args.input), Path(args.output_dir))
+        return 0
+
+    if args.command == "build-batches":
+        build_batch_files(
+            model_input_path=Path(args.input),
+            output_dir=Path(args.output_dir),
+            batch_size=args.batch_size,
+            run_id=args.run_id,
+        )
+        return 0
+
+    if args.command == "run-batch-label":
+        settings = get_openai_settings(
+            base_url_override=args.base_url,
+            model_override=args.model,
+            timeout_seconds_override=args.timeout_seconds,
+        )
+        config = BatchApiConfig(
+            base_url=settings.base_url,
+            api_key=settings.api_key,
+            model=settings.model,
+            timeout_seconds=settings.timeout_seconds,
+        )
+        run_batch_labeling(
+            batch_path=Path(args.input),
+            output_path=Path(args.output),
+            config=config,
+        )
+        return 0
+
+    if args.command == "validate-labels":
+        validate_raw_results(
+            raw_path=Path(args.input),
+            valid_output_path=Path(args.output),
+            failure_output_path=Path(args.failures_output),
+        )
         return 0
 
     if args.command == "run-pipeline":
