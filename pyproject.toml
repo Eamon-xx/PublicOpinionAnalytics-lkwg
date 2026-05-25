@@ -4,9 +4,13 @@ version = "0.1.0"
 description = ""
 authors = ["蒙奇_D_路飞 <2045705885@qq.com>"]
 readme = "README.md"
+packages = [{ include = "public_opinion", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
+
+[tool.poetry.scripts]
+public-opinion = "public_opinion.cli:main"
 
 
 [build-system]

@@ -87,7 +87,7 @@
 
 ### 第 2 层：标准化层
 
-输出建议：`data/normalized/comments.parquet`
+输出建议：百万级稳定运行时使用 `data/normalized/comments.parquet`。首版为了减少依赖，先落地为 `CSV`，保持后续可平滑切换。
 
 字段示例：
 
@@ -121,7 +121,7 @@
 
 ### 第 3 层：规则标签层
 
-输出建议：`data/processed/comments_rules.parquet`
+输出建议：百万级稳定运行时使用 `data/processed/comments_rules.parquet`。首版先输出 `CSV`，模型交换层继续使用 `JSONL`。
 
 新增字段示例：
 
@@ -355,8 +355,8 @@ PublicOpinionAnalytics/
 
 ## 已知限制
 
-- 当前目录不是 Git 仓库，本设计文档无法提交版本记录。
-- 若后续真实数据量达到百万级，建议优先使用 Parquet 作为主分析格式。
+- 首版为了控制环境复杂度，主中间层使用 CSV 而不是 Parquet。
+- 若后续真实数据量达到百万级，建议优先切换到 Parquet 作为主分析格式。
 - 若评论字段结构发生变化，需要在标准化层做字段映射兼容。
 
 ## 下一步
