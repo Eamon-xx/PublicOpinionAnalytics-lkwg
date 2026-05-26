@@ -9,19 +9,16 @@ from public_opinion.models import CommentRecord
 def export_model_inputs(records: list[CommentRecord], output_path: Path) -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    eligible = [
+        r for r in records
+        if not r.is_low_info and r.analysis_priority != "low"
+    ]
+
+    representatives = _pick_group_representatives(eligible)
+
     written = 0
-    seen_template_groups: set[str] = set()
-
     with output_path.open("w", encoding="utf-8", newline="\n") as file:
-        for record in records:
-            if record.is_low_info or record.analysis_priority == "low":
-                continue
-
-            if record.template_group:
-                if record.template_group in seen_template_groups:
-                    continue
-                seen_template_groups.add(record.template_group)
-
+        for record in representatives:
             payload = {
                 "comment_id": record.comment_id,
                 "comment_text_clean": record.comment_text_clean,
@@ -43,3 +40,24 @@ def export_model_inputs(records: list[CommentRecord], output_path: Path) -> int:
             written += 1
 
     return written
+
+
+def _pick_group_representatives(records: list[CommentRecord]) -> list[CommentRecord]:
+    best_by_group: dict[str, CommentRecord] = {}
+    ungrouped: list[CommentRecord] = []
+
+    for record in records:
+        canonical = record.canonical_template_group
+        if not canonical:
+            ungrouped.append(record)
+            continue
+
+        existing = best_by_group.get(canonical)
+        if existing is None or _record_sort_key(record) > _record_sort_key(existing):
+            best_by_group[canonical] = record
+
+    return list(best_by_group.values()) + ungrouped
+
+
+def _record_sort_key(record: CommentRecord) -> tuple[int, int]:
+    return (record.like_count, record.char_len)

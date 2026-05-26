@@ -41,7 +41,7 @@ def normalize_comments(csv_path: Path) -> list[CommentRecord]:
                 like_count=_parse_int(row.get("点赞数")) or 0,
                 signature=(row.get("个性签名") or "").strip(),
                 ip_location=(row.get("IP属地") or "").strip(),
-                vip_flag=_parse_bool_flag(row.get("是否是大会员")),
+                vip_flag=_parse_bool_flag(row.get("是否是大会员") or row.get("是否为大会员")),
                 avatar_url=(row.get("头像") or "").strip(),
                 source_file=csv_path.name,
             )

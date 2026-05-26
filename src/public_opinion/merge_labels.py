@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from public_opinion.models import CommentRecord
+from public_opinion.rules import _canonical_for_grouping as _canonical_for_merge
 
 
 def merge_model_labels(records: list[CommentRecord], labels_path: Path) -> list[CommentRecord]:
     labels_by_comment_id: dict[str, dict[str, Any]] = {}
     labels_by_template_group: dict[str, dict[str, Any]] = {}
+    labels_by_canonical: dict[str, dict[str, Any]] = {}
 
     with labels_path.open("r", encoding="utf-8") as file:
         for line in file:
@@ -20,11 +22,16 @@ def merge_model_labels(records: list[CommentRecord], labels_path: Path) -> list[
                 labels_by_comment_id[comment_id] = payload
             if template_group:
                 labels_by_template_group[template_group] = payload
+                canonical = _canonical_for_merge(template_group)
+                if canonical:
+                    labels_by_canonical[canonical] = payload
 
     for record in records:
         payload = labels_by_comment_id.get(record.comment_id)
         if payload is None and record.template_group:
             payload = labels_by_template_group.get(record.template_group)
+        if payload is None and record.canonical_template_group:
+            payload = labels_by_canonical.get(record.canonical_template_group)
         if payload is None:
             continue
         _apply_payload(record, payload)

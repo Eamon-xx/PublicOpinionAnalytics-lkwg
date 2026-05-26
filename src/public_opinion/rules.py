@@ -43,6 +43,28 @@ RISK_KEYWORDS: tuple[tuple[str, str], ...] = (
     ("极端表达", "杀"),
 )
 NON_WORD_RE = re.compile(r"\s+")
+_PUNCT_RE = re.compile(r"[，。！？、；：""''【】《》（）\(\)\[\]\{\}<>/\\@#\$%\^&\*\-_\+=\|~`…·​‌‍﻿]")
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001f600-\U0001f64f"
+    "\U0001f300-\U0001f5ff"
+    "\U0001f680-\U0001f6ff"
+    "\U0001f1e0-\U0001f1ff"
+    "\U00002702-\U000027b0"
+    "\U0001f900-\U0001f9ff"
+    "\U0001fa00-\U0001fa6f"
+    "\U0001fa70-\U0001faff"
+    "\U00002600-\U000026ff"
+    "\U0000fe00-\U0000fe0f"
+    "\U0000200d"
+    "\U00002b50"
+    "\U000023cf"
+    "\U000023e9-\U000023f3"
+    "\U000023f8-\U000023fa"
+    "]+",
+    flags=re.UNICODE,
+)
+_BRACKET_TAG_RE = re.compile(r"\[[^\[\]]{1,10}\]")
 
 
 def apply_rules(records: list[CommentRecord]) -> list[CommentRecord]:
@@ -61,9 +83,24 @@ def apply_rules(records: list[CommentRecord]) -> list[CommentRecord]:
         record.rule_risk_tags = _collect_tags(clean_text, RISK_KEYWORDS)
         record.is_template_text = template_counts[clean_text] > 1 if clean_text else False
         record.template_group = clean_text if record.is_template_text else ""
+        record.canonical_template_group = _canonical_for_grouping(clean_text)
         record.analysis_priority = _assign_priority(record)
 
+    _assign_canonical_groups(records)
     return records
+
+
+def _assign_canonical_groups(records: list[CommentRecord]) -> None:
+    canonical_counts: Counter[str] = Counter()
+    for record in records:
+        if record.canonical_template_group:
+            canonical_counts[record.canonical_template_group] += 1
+
+    for record in records:
+        canonical = record.canonical_template_group
+        if canonical and canonical_counts[canonical] > 1:
+            record.is_template_text = True
+            record.template_group = canonical
 
 
 def _is_low_info(text: str, record: CommentRecord) -> bool:
@@ -107,3 +144,13 @@ def _is_only_emoji_or_punct(text: str) -> bool:
         if not (category.startswith("P") or category.startswith("S")):
             return False
     return True
+
+
+def _canonical_for_grouping(text: str) -> str:
+    if not text:
+        return ""
+    result = _BRACKET_TAG_RE.sub("", text)
+    result = _EMOJI_RE.sub("", result)
+    result = _PUNCT_RE.sub("", result)
+    result = NON_WORD_RE.sub("", result)
+    return result

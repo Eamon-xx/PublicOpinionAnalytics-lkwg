@@ -5,7 +5,7 @@ import unittest
 
 
 from public_opinion.models import CommentRecord
-from public_opinion.rules import apply_rules
+from public_opinion.rules import apply_rules, _canonical_for_grouping
 
 
 def make_record(comment_id: str, user_id: str, text: str, like_count: int = 0) -> CommentRecord:
@@ -48,6 +48,38 @@ class RuleTaggingTests(unittest.TestCase):
         self.assertTrue(enriched[2].is_template_text)
         self.assertEqual(enriched[2].template_group, enriched[3].template_group)
         self.assertEqual(enriched[2].analysis_priority, "high")
+
+    def test_canonical_for_grouping_strips_punctuation_and_emoji(self) -> None:
+        self.assertEqual(_canonical_for_grouping("认错态度不端正，处理方案难服众！"), "认错态度不端正处理方案难服众")
+        self.assertEqual(_canonical_for_grouping("认错态度不端正，处理方案难服众"), "认错态度不端正处理方案难服众")
+        self.assertEqual(_canonical_for_grouping("冲[打call]"), "冲")
+        self.assertEqual(_canonical_for_grouping("冲冲冲😡😡"), "冲冲冲")
+        self.assertEqual(_canonical_for_grouping(""), "")
+        self.assertEqual(_canonical_for_grouping("顶"), "顶")
+
+    def test_near_duplicates_share_template_group(self) -> None:
+        records = apply_rules([
+            make_record("c1", "u1", "认错态度不端正，处理方案难服众！", like_count=100),
+            make_record("c2", "u2", "认错态度不端正，处理方案难服众", like_count=50),
+            make_record("c3", "u3", "认错态度不端正，处理方案难服众。", like_count=10),
+        ])
+
+        self.assertTrue(records[0].is_template_text)
+        self.assertTrue(records[1].is_template_text)
+        self.assertTrue(records[2].is_template_text)
+        self.assertEqual(records[0].template_group, records[1].template_group)
+        self.assertEqual(records[1].template_group, records[2].template_group)
+        self.assertEqual(records[0].canonical_template_group, "认错态度不端正处理方案难服众")
+
+    def test_canonical_groups_emoji_variants(self) -> None:
+        records = apply_rules([
+            make_record("c1", "u1", "冲[打call]", like_count=10),
+            make_record("c2", "u2", "冲", like_count=5),
+        ])
+
+        self.assertTrue(records[0].is_template_text)
+        self.assertTrue(records[1].is_template_text)
+        self.assertEqual(records[0].template_group, records[1].template_group)
 
 
 if __name__ == "__main__":

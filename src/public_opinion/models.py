@@ -32,6 +32,7 @@ class CommentRecord:
     is_only_emoji_or_punct: bool = False
     is_template_text: bool = False
     template_group: str = ""
+    canonical_template_group: str = ""
     is_low_info: bool = False
     is_mobilization: bool = False
     rule_topic_tags: list[str] = field(default_factory=list)
